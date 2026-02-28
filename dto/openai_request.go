@@ -26,36 +26,38 @@ type FormatJsonSchema struct {
 // GeneralOpenAIRequest represents a general request structure for OpenAI-compatible APIs.
 // 参数增加规范：无引用的参数必须使用json.RawMessage类型，并添加omitempty标签
 type GeneralOpenAIRequest struct {
-	Model               string            `json:"model,omitempty"`
-	Messages            []Message         `json:"messages,omitempty"`
-	Prompt              any               `json:"prompt,omitempty"`
-	Prefix              any               `json:"prefix,omitempty"`
-	Suffix              any               `json:"suffix,omitempty"`
-	Stream              bool              `json:"stream,omitempty"`
-	StreamOptions       *StreamOptions    `json:"stream_options,omitempty"`
-	MaxTokens           uint              `json:"max_tokens,omitempty"`
-	MaxCompletionTokens uint              `json:"max_completion_tokens,omitempty"`
-	ReasoningEffort     string            `json:"reasoning_effort,omitempty"`
-	Verbosity           json.RawMessage   `json:"verbosity,omitempty"` // gpt-5
-	Temperature         *float64          `json:"temperature,omitempty"`
-	TopP                float64           `json:"top_p,omitempty"`
-	TopK                int               `json:"top_k,omitempty"`
-	Stop                any               `json:"stop,omitempty"`
-	N                   int               `json:"n,omitempty"`
-	Input               any               `json:"input,omitempty"`
-	Instruction         string            `json:"instruction,omitempty"`
-	Size                string            `json:"size,omitempty"`
-	Functions           json.RawMessage   `json:"functions,omitempty"`
-	FrequencyPenalty    float64           `json:"frequency_penalty,omitempty"`
-	PresencePenalty     float64           `json:"presence_penalty,omitempty"`
-	ResponseFormat      *ResponseFormat   `json:"response_format,omitempty"`
-	EncodingFormat      json.RawMessage   `json:"encoding_format,omitempty"`
-	Seed                float64           `json:"seed,omitempty"`
-	ParallelTooCalls    *bool             `json:"parallel_tool_calls,omitempty"`
-	Tools               []ToolCallRequest `json:"tools,omitempty"`
-	ToolChoice          any               `json:"tool_choice,omitempty"`
-	FunctionCall        json.RawMessage   `json:"function_call,omitempty"`
-	User                string            `json:"user,omitempty"`
+	Model    string    `json:"model,omitempty"`
+	Messages []Message `json:"messages,omitempty"`
+	// Gemini/Flow2API compatible fields (for /v1/chat/completions passthrough).
+	Contents            []GeminiChatContent `json:"contents,omitempty"`
+	Prompt              any                 `json:"prompt,omitempty"`
+	Prefix              any                 `json:"prefix,omitempty"`
+	Suffix              any                 `json:"suffix,omitempty"`
+	Stream              bool                `json:"stream,omitempty"`
+	StreamOptions       *StreamOptions      `json:"stream_options,omitempty"`
+	MaxTokens           uint                `json:"max_tokens,omitempty"`
+	MaxCompletionTokens uint                `json:"max_completion_tokens,omitempty"`
+	ReasoningEffort     string              `json:"reasoning_effort,omitempty"`
+	Verbosity           json.RawMessage     `json:"verbosity,omitempty"` // gpt-5
+	Temperature         *float64            `json:"temperature,omitempty"`
+	TopP                float64             `json:"top_p,omitempty"`
+	TopK                int                 `json:"top_k,omitempty"`
+	Stop                any                 `json:"stop,omitempty"`
+	N                   int                 `json:"n,omitempty"`
+	Input               any                 `json:"input,omitempty"`
+	Instruction         string              `json:"instruction,omitempty"`
+	Size                string              `json:"size,omitempty"`
+	Functions           json.RawMessage     `json:"functions,omitempty"`
+	FrequencyPenalty    float64             `json:"frequency_penalty,omitempty"`
+	PresencePenalty     float64             `json:"presence_penalty,omitempty"`
+	ResponseFormat      *ResponseFormat     `json:"response_format,omitempty"`
+	EncodingFormat      json.RawMessage     `json:"encoding_format,omitempty"`
+	Seed                float64             `json:"seed,omitempty"`
+	ParallelTooCalls    *bool               `json:"parallel_tool_calls,omitempty"`
+	Tools               []ToolCallRequest   `json:"tools,omitempty"`
+	ToolChoice          any                 `json:"tool_choice,omitempty"`
+	FunctionCall        json.RawMessage     `json:"function_call,omitempty"`
+	User                string              `json:"user,omitempty"`
 	// ServiceTier specifies upstream service level and may affect billing.
 	// This field is filtered by default and can be enabled via channel setting allow_service_tier.
 	ServiceTier string          `json:"service_tier,omitempty"`
@@ -79,6 +81,8 @@ type GeneralOpenAIRequest struct {
 	Prediction           json.RawMessage `json:"prediction,omitempty"`
 	// gemini
 	ExtraBody json.RawMessage `json:"extra_body,omitempty"`
+	// Gemini/Flow2API compatible generation config passthrough.
+	GenerationConfig json.RawMessage `json:"generationConfig,omitempty"`
 	//xai
 	SearchParameters json.RawMessage `json:"search_parameters,omitempty"`
 	// claude
@@ -193,6 +197,50 @@ func (r *GeneralOpenAIRequest) GetTokenCountMeta() *types.TokenCountMeta {
 					}
 				} else {
 					texts = append(texts, m.Text)
+				}
+			}
+		}
+	}
+
+	// Compatibility fallback: allow Gemini-style contents in /v1/chat/completions
+	// when messages are not provided (e.g. Flow2API local compatibility).
+	if len(r.Messages) == 0 && len(r.Contents) > 0 {
+		for _, content := range r.Contents {
+			for _, part := range content.Parts {
+				if part.Text != "" {
+					texts = append(texts, part.Text)
+				}
+				if part.InlineData != nil && part.InlineData.Data != "" {
+					source := createGeminiFileSource(part.InlineData.Data, part.InlineData.MimeType)
+					fileType := types.FileTypeFile
+					if strings.HasPrefix(part.InlineData.MimeType, "image/") {
+						fileType = types.FileTypeImage
+					} else if strings.HasPrefix(part.InlineData.MimeType, "audio/") {
+						fileType = types.FileTypeAudio
+					} else if strings.HasPrefix(part.InlineData.MimeType, "video/") {
+						fileType = types.FileTypeVideo
+					}
+					fileMeta = append(fileMeta, &types.FileMeta{
+						FileType: fileType,
+						Source:   source,
+						MimeType: part.InlineData.MimeType,
+					})
+				}
+				if part.FileData != nil && part.FileData.FileUri != "" {
+					source := createGeminiFileSource(part.FileData.FileUri, part.FileData.MimeType)
+					fileType := types.FileTypeFile
+					if strings.HasPrefix(part.FileData.MimeType, "image/") {
+						fileType = types.FileTypeImage
+					} else if strings.HasPrefix(part.FileData.MimeType, "audio/") {
+						fileType = types.FileTypeAudio
+					} else if strings.HasPrefix(part.FileData.MimeType, "video/") {
+						fileType = types.FileTypeVideo
+					}
+					fileMeta = append(fileMeta, &types.FileMeta{
+						FileType: fileType,
+						Source:   source,
+						MimeType: part.FileData.MimeType,
+					})
 				}
 			}
 		}

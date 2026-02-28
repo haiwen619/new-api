@@ -198,13 +198,16 @@ func ThinkingAdaptor(geminiRequest *dto.GeminiChatRequest, info *relaycommon.Rel
 func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, info *relaycommon.RelayInfo) (*dto.GeminiChatRequest, error) {
 
 	geminiRequest := dto.GeminiChatRequest{
-		Contents: make([]dto.GeminiChatContent, 0, len(textRequest.Messages)),
+		Contents: make([]dto.GeminiChatContent, 0, max(len(textRequest.Messages), len(textRequest.Contents))),
 		GenerationConfig: dto.GeminiChatGenerationConfig{
 			Temperature:     textRequest.Temperature,
 			TopP:            textRequest.TopP,
 			MaxOutputTokens: textRequest.GetMaxTokens(),
 			Seed:            int64(textRequest.Seed),
 		},
+	}
+	if len(textRequest.Messages) == 0 && len(textRequest.Contents) > 0 {
+		geminiRequest.Contents = append(geminiRequest.Contents, textRequest.Contents...)
 	}
 
 	attachThoughtSignature := (info.ChannelType == constant.ChannelTypeGemini ||
@@ -223,6 +226,9 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 			stopSequences = stopSequences[:5]
 		}
 		geminiRequest.GenerationConfig.StopSequences = stopSequences
+	}
+	if err := applyOpenAICompatibleGenerationConfig(&geminiRequest.GenerationConfig, textRequest.GenerationConfig); err != nil {
+		return nil, err
 	}
 
 	adaptorWithExtraBody := false
@@ -688,6 +694,61 @@ func parseStopSequences(stop any) []string {
 		return sequences
 	}
 	return nil
+}
+
+func applyOpenAICompatibleGenerationConfig(target *dto.GeminiChatGenerationConfig, raw json.RawMessage) error {
+	if len(raw) == 0 {
+		return nil
+	}
+
+	var cfg map[string]interface{}
+	if err := common.Unmarshal(raw, &cfg); err != nil {
+		return fmt.Errorf("invalid generationConfig: %w", err)
+	}
+
+	if v, ok := cfg["responseModalities"]; ok {
+		target.ResponseModalities = toStringSlice(v)
+	} else if v, ok := cfg["response_modalities"]; ok {
+		target.ResponseModalities = toStringSlice(v)
+	}
+
+	if v, ok := cfg["imageConfig"]; ok {
+		imageConfigBytes, err := common.Marshal(v)
+		if err != nil {
+			return fmt.Errorf("invalid generationConfig.imageConfig: %w", err)
+		}
+		target.ImageConfig = imageConfigBytes
+	} else if v, ok := cfg["image_config"]; ok {
+		imageConfigBytes, err := common.Marshal(v)
+		if err != nil {
+			return fmt.Errorf("invalid generationConfig.image_config: %w", err)
+		}
+		target.ImageConfig = imageConfigBytes
+	}
+
+	return nil
+}
+
+func toStringSlice(value interface{}) []string {
+	switch v := value.(type) {
+	case []string:
+		return v
+	case []interface{}:
+		result := make([]string, 0, len(v))
+		for _, item := range v {
+			if str, ok := item.(string); ok && str != "" {
+				result = append(result, str)
+			}
+		}
+		return result
+	case string:
+		if v == "" {
+			return nil
+		}
+		return []string{v}
+	default:
+		return nil
+	}
 }
 
 func hasFunctionCallContent(call *dto.FunctionCall) bool {

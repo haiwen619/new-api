@@ -27,3 +27,5 @@ data/
 .gomodcache/
 .gocache-temp
 .gopath
+/.vs
+/web/.bun-tmp/.3ef77ebf77d5fdf7-00000000.hm

@@ -1,3 +1,97 @@
+
+源码自编译（先前端再后端）：
+cd web
+bun install
+bun run build
+cd ..
+go build -o new-api.exe
+.\new-api.exe
+
+
+PORT=3000
+SESSION_SECRET=jHrrRDxVD5twXN2t
+SQLITE_PATH=D:/new-api/data/one-api.db?_busy_timeout=30000
+
+
+按可直接落地的 Windows Server 方案继续，推荐你用 Release 的 .exe + NSSM。
+
+
+
+New-Item -ItemType Directory -Force D:\new-api\logs | Out-Null
+New-Item -ItemType Directory -Force D:\new-api\data | Out-Null
+
+把发布页下载的 new-api-xxx.exe 放到 new-api.exe。
+
+ 写 .env（最小可用）
+在 D:\new-api\.env 放：
+
+PORT=3000
+SESSION_SECRET=换成高强度随机字符串
+SQLITE_PATH=D:/new-api/data/one-api.db?_busy_timeout=30000
+
+cd D:\new-api
+.\new-api.exe
+浏览器访问 http://127.0.0.1:3000，确认能打开后 Ctrl+C 停止。
+
+4. 放通防火墙端口（如需外网访问）
+
+New-NetFirewallRule -DisplayName "new-api-3000" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3000
+
+
+
+1. 注册为 Windows 服务（NSSM）
+先安装 NSSM（下载后假设路径 nssm.exe）：
+D:\tools\nssm\nssm.exe install NewAPI D:\new-api\new-api.exe
+D:\tools\nssm\nssm.exe set NewAPI AppDirectory D:\new-api
+D:\tools\nssm\nssm.exe set NewAPI AppStdout D:\new-api\logs\stdout.log
+D:\tools\nssm\nssm.exe set NewAPI AppStderr D:\new-api\logs\stderr.log
+D:\tools\nssm\nssm.exe set NewAPI Start SERVICE_AUTO_START
+D:\tools\nssm\nssm.exe start NewAPI
+
+1. 验证服务状态
+sc query NewAPI
+Invoke-WebRequest http://127.0.0.1:3000 -UseBasicParsing
+
+升级方式
+D:\tools\nssm\nssm.exe stop NewAPI
+# 替换 D:\new-api\new-api.exe
+D:\tools\nssm\nssm.exe start NewAPI
+
+
+
+
+
+
+mkdir C:\Publish\new-api\new-api\data -Force
+'test' | Set-Content C:\Publish\new-api\new-api\data\write_test.txt
+
+
+C:\Publish\nssm-2.24\nssm-2.24\win64\nssm.exe install NewAPI C:\Publish\new-api\new-api.exe
+C:\Publish\nssm-2.24\nssm-2.24\win64\nssm.exe set NewAPI AppDirectory C:\Publish\new-api
+C:\Publish\nssm-2.24\nssm-2.24\win64\nssm.exe set NewAPI AppStdout C:\Publish\new-api\logs\stdout.log
+C:\Publish\nssm-2.24\nssm-2.24\win64\nssm.exe set NewAPI AppStderr C:\Publish\new-api\logs\stderr.log
+C:\Publish\nssm-2.24\nssm-2.24\win64\nssm.exe set NewAPI Start SERVICE_AUTO_START
+C:\Publish\nssm-2.24\nssm-2.24\win64\nssm.exe start NewAPI
+
+端口变成 7861 的原因是：程序优先读取环境变量 PORT。
+
+先在服务器上确认：
+$env:PORT
+[Environment]::GetEnvironmentVariable("PORT","User")
+[Environment]::GetEnvironmentVariable("PORT","Machine")
+
+临时改回 3000（当前会话）：
+$env:PORT="3000"
+.\new-api.exe
+
+或清掉当前会话变量：
+Remove-Item Env:PORT -ErrorAction SilentlyContinue
+.\new-api.exe
+
+
+
+
+
 <div align="center">
 
 ![new-api](/web/public/logo.png)
