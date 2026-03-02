@@ -722,7 +722,7 @@ func GeminiToOpenAIRequest(geminiRequest *dto.GeminiChatRequest, info *relaycomm
 		openaiRequest.Stop = geminiRequest.GenerationConfig.StopSequences[:4]
 	}
 	if geminiRequest.GenerationConfig.CandidateCount != nil && *geminiRequest.GenerationConfig.CandidateCount > 0 {
-		openaiRequest.N = lo.ToPtr(*geminiRequest.GenerationConfig.CandidateCount)
+		openaiRequest.N = lo.ToPtr(uint(*geminiRequest.GenerationConfig.CandidateCount))
 	}
 
 	// 转换工具调用
