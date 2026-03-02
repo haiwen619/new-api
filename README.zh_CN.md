@@ -1,4 +1,22 @@
 
+# 使用说明
+
+先备份并确保工作区干净
+git status
+git branch backup/main-before-upstream-20260302
+添加上游仓库（只需一次）
+git remote add upstream https://github.com/QuantumNous/new-api.git
+git remote -v
+
+拉取上游最新代码
+git fetch upstream
+
+同步到你的 main（推荐用 merge，简单稳妥）
+git checkout main
+git pull --ff-only origin main
+git merge upstream/main
+
+
 源码自编译（先前端再后端）：
 cd web
 bun install
