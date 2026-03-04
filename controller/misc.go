@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -226,6 +228,39 @@ func GetHomePageContent(c *gin.Context) {
 		"data":    common.OptionMap["HomePageContent"],
 	})
 	return
+}
+
+func GetKatuReadme(c *gin.Context) {
+	candidatePaths := []string{
+		filepath.Clean("docs/katuReadme.md"),
+	}
+
+	if exePath, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exePath)
+		candidatePaths = append(candidatePaths,
+			filepath.Join(exeDir, "docs", "katuReadme.md"),
+			filepath.Join(exeDir, "..", "docs", "katuReadme.md"),
+		)
+	}
+
+	var content []byte
+	var readErr error
+	for _, p := range candidatePaths {
+		content, readErr = os.ReadFile(p)
+		if readErr == nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": true,
+				"message": "",
+				"data":    string(content),
+			})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": false,
+		"message": "说明文档不存在或读取失败",
+	})
 }
 
 func SendEmailVerification(c *gin.Context) {
