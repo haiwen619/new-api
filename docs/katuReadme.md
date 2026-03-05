@@ -23,7 +23,7 @@ gemini-3.1-flash-image-Flow 解析为 gemini-3.1-flash-image
 
 ### 图片生成示例（gemini-3.1-flash-image）
 测试请求：
-  curl -X POST "http://127.0.0.1:3000/v1/chat/completions" \
+  curl -X POST "http:v1/chat/completions" \
   -H "Authorization: Bearer sk-" \
   -H "Content-Type: application/json" \
   -d '{
@@ -39,8 +39,8 @@ gemini-3.1-flash-image-Flow 解析为 gemini-3.1-flash-image
   }'
 
 
-  curl -X POST "http://23.159.248.139:3000/v1/chat/completions" \
-  -H "Authorization: Bearer sk-lPSOlrLXS6KfFq12yDdXa4d3cc9Bcx5BatP9Lf9mdVTPDFAf" \
+  curl -X POST "http:v1/chat/completions" \
+  -H "Authorization: Bearer sk-" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gemini-3.1-flash-image-Flow",
