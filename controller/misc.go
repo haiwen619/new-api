@@ -10,6 +10,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
+	projectdocs "github.com/QuantumNous/new-api/docs"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/oauth"
@@ -231,6 +232,16 @@ func GetHomePageContent(c *gin.Context) {
 }
 
 func GetKatuReadme(c *gin.Context) {
+	embeddedContent := projectdocs.GetKatuReadme()
+	if embeddedContent != "" {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "",
+			"data":    embeddedContent,
+		})
+		return
+	}
+
 	candidatePaths := []string{
 		filepath.Clean("docs/katuReadme.md"),
 	}
